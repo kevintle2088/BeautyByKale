@@ -8,9 +8,9 @@ export async function POST(request: Request){
     const body = await request.json();
 
     //checks if all params are availble
-    const { slot_id, client_name, client_email, client_phone } = body;
+    const { slot_id, client_name, client_email, client_phone, service } = body;
 
-    if (!slot_id || !client_email || !client_name || !client_phone) {
+    if (!slot_id || !client_email || !client_name || !client_phone || !service) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
     //check regex of email to ensure the format is correct.
@@ -45,7 +45,7 @@ export async function POST(request: Request){
    // queries the db to insert the time slot into the bookings table
     const { data: booking, error: bookingError } = await supabaseAdmin()
         .from('bookings')
-        .insert({ slot_id, client_email: client_email.toLowerCase().trim(), client_name, client_phone })
+        .insert({ slot_id, client_email: client_email.toLowerCase().trim(), client_name, client_phone, service })
         .select()
         .single();
 
