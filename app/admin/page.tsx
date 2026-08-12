@@ -25,7 +25,10 @@ type Booking = {
 
 type Tab = "calendar" | "add" | "appointments" | "reschedule";
 
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "";
+async function authHeaders(): Promise<HeadersInit> {
+  const { data } = await supabasePublic.auth.getSession();
+  return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {};
+}
 
 export default function AdminPage() {
   const [checking, setChecking] = useState(true);
@@ -38,8 +41,9 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function checkSession() {
-      const { data } = await supabasePublic.auth.getSession();
-      if (!data.session) {
+      const { data, error } = await supabasePublic.auth.getUser();
+      if (error || !data.user) {
+        await supabasePublic.auth.signOut();
         router.push("/admin/login");
         return;
       }
@@ -50,14 +54,11 @@ export default function AdminPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    const headers = await authHeaders();
     const [bookingsRes, slotsRes, allSlotsRes] = await Promise.all([
-      fetch("/api/admin/bookings", {
-        headers: { "admin-password": ADMIN_PASSWORD },
-      }),
+      fetch("/api/admin/bookings", { headers }),
       fetch("/api/slots"),
-      fetch("/api/admin/slots", {
-        headers: { "admin-password": ADMIN_PASSWORD },
-      }),
+      fetch("/api/admin/slots", { headers }),
     ]);
     const bookingsData = await bookingsRes.json();
     const slotsData = await slotsRes.json();
@@ -174,11 +175,16 @@ function getCurrentWeekDates(): Date[] {
   });
 }
 
-function getMonthDates(ref: Date): Date[] {
+function getMonthDates(ref: Date): (Date | null)[] {
   const year = ref.getFullYear();
   const month = ref.getMonth();
+  const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  return Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1));
+  const cells: (Date | null)[] = Array(firstWeekday).fill(null);
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push(new Date(year, month, day));
+  }
+  return cells;
 }
 
 function formatDateKey(d: Date): string {
@@ -272,26 +278,31 @@ function CalendarView({
         </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
-        {datesToShow.map((date) => {
+      <div className="grid grid-cols-7 gap-1.5 mb-1">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+          <div key={d} className="text-center text-[10px] uppercase tracking-wide text-black/40 py-1">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1.5">
+        {datesToShow.map((date, i) => {
+          if (!date) return <div key={`empty-${i}`} />;
           const key = formatDateKey(date);
           const daySlots = slots
             .filter((s) => s.date === key)
             .sort((a, b) => a.time.localeCompare(b.time));
 
           return (
-            <div key={key} className="border border-black/10 rounded-xl p-3">
-              <div className="text-sm font-medium mb-2">
-                {date.toLocaleDateString(undefined, {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })}
+            <div key={key} className="border border-black/10 rounded-xl p-2">
+              <div className="text-xs font-medium mb-1.5">
+                {date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </div>
               {daySlots.length === 0 ? (
-                <p className="text-xs text-black/40">No slots</p>
+                <p className="text-[11px] text-black/40">No slots</p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-1.5">
                   {daySlots.map((s) => {
                     const booking = activeBookingBySlot.get(s.id);
                     return (
@@ -350,7 +361,7 @@ function AddTimeslotsView({ onCreated }: { onCreated: () => void }) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "admin-password": ADMIN_PASSWORD,
+        ...(await authHeaders()),
       },
       body: JSON.stringify({ date, time }),
     });
@@ -430,7 +441,7 @@ function AppointmentsView({
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "admin-password": ADMIN_PASSWORD,
+        ...(await authHeaders()),
       },
       body: JSON.stringify({ action }),
     });
@@ -441,10 +452,26 @@ function AppointmentsView({
     if (!confirm("Cancel this appointment?")) return;
     await fetch(`/api/admin/bookings/${id}/cancel`, {
       method: "PATCH",
-      headers: { "admin-password": ADMIN_PASSWORD },
+      headers: await authHeaders(),
     });
     onChange();
   }
+
+  async function removeSlot(id: string) {
+    if (!confirm("Remove this timeslot?")) return;
+    const res = await fetch(`/api/slots/${id}`, {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || "Could not remove slot");
+      return;
+    }
+    onChange();
+  }
+
+  const openSlots = sortedSlots.filter((s) => s.status === "open");
 
   return (
     <div>
@@ -452,8 +479,11 @@ function AppointmentsView({
         Appointments
       </h1>
 
-      <h2 className="text-sm font-medium mb-3 text-black/60">All Timeslots</h2>
-      <SlotTable slots={sortedSlots} />
+      <h2 className="text-sm font-medium mb-3 text-black/60">Book for Client</h2>
+      <BookForClientForm openSlots={openSlots} onBooked={onChange} />
+
+      <h2 className="text-sm font-medium mb-3 mt-10 text-black/60">All Timeslots</h2>
+      <SlotTable slots={sortedSlots} onRemove={removeSlot} />
 
       <h2 className="text-sm font-medium mb-3 mt-10 text-black/60">Pending</h2>
       <BookingTable
@@ -535,7 +565,134 @@ function BookingTable({
   );
 }
 
-function SlotTable({ slots }: { slots: Slot[] }) {
+function BookForClientForm({
+  openSlots,
+  onBooked,
+}: {
+  openSlots: Slot[];
+  onBooked: () => void;
+}) {
+  const [slotId, setSlotId] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [service, setService] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage("");
+
+    const res = await fetch("/api/admin/bookings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(await authHeaders()),
+      },
+      body: JSON.stringify({
+        slot_id: slotId,
+        client_name: clientName,
+        client_email: clientEmail,
+        client_phone: clientPhone,
+        service,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setMessage(data.error || "Something went wrong");
+    } else {
+      setMessage("Booked");
+      setSlotId("");
+      setClientName("");
+      setClientEmail("");
+      setClientPhone("");
+      setService("");
+      onBooked();
+    }
+    setSubmitting(false);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 mb-4">
+      <div>
+        <label className="block text-xs mb-1 text-black/60">Timeslot</label>
+        <select
+          required
+          value={slotId}
+          onChange={(e) => setSlotId(e.target.value)}
+          className="border border-black/20 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">Select slot...</option>
+          {openSlots.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.date} at {formatTime(s.time)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs mb-1 text-black/60">Client Name</label>
+        <input
+          type="text"
+          required
+          value={clientName}
+          onChange={(e) => setClientName(e.target.value)}
+          className="border border-black/20 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs mb-1 text-black/60">Email</label>
+        <input
+          type="email"
+          required
+          value={clientEmail}
+          onChange={(e) => setClientEmail(e.target.value)}
+          className="border border-black/20 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs mb-1 text-black/60">Phone</label>
+        <input
+          type="tel"
+          required
+          value={clientPhone}
+          onChange={(e) => setClientPhone(e.target.value)}
+          className="border border-black/20 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <div>
+        <label className="block text-xs mb-1 text-black/60">Service</label>
+        <input
+          type="text"
+          required
+          value={service}
+          onChange={(e) => setService(e.target.value)}
+          className="border border-black/20 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="text-xs bg-[var(--ink)] text-white rounded-full px-4 py-2.5 disabled:opacity-50"
+      >
+        {submitting ? "Booking..." : "Book"}
+      </button>
+      {message && <p className="text-sm w-full">{message}</p>}
+    </form>
+  );
+}
+
+function SlotTable({
+  slots,
+  onRemove,
+}: {
+  slots: Slot[];
+  onRemove: (id: string) => void;
+}) {
   if (slots.length === 0) {
     return <p className="text-sm text-black/40 mb-4">No timeslots yet.</p>;
   }
@@ -549,6 +706,7 @@ function SlotTable({ slots }: { slots: Slot[] }) {
             <th className="py-2 pr-4">Time</th>
             <th className="py-2 pr-4">Duration</th>
             <th className="py-2 pr-4">Status</th>
+            <th className="py-2"></th>
           </tr>
         </thead>
         <tbody>
@@ -559,6 +717,16 @@ function SlotTable({ slots }: { slots: Slot[] }) {
               <td className="py-3 pr-4">{s.duration_minutes} min</td>
               <td className="py-3 pr-4">
                 <StatusBadge status={s.status} />
+              </td>
+              <td className="py-3">
+                {s.status === "open" && (
+                  <button
+                    onClick={() => onRemove(s.id)}
+                    className="text-xs border border-black/20 rounded-full px-3 py-1.5"
+                  >
+                    Remove
+                  </button>
+                )}
               </td>
             </tr>
           ))}
@@ -588,7 +756,7 @@ function RescheduleView({
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "admin-password": ADMIN_PASSWORD,
+        ...(await authHeaders()),
       },
       body: JSON.stringify({ new_slot_id: newSlotId }),
     });

@@ -1,12 +1,13 @@
 import { supabaseAdmin } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/adminAuth";
 import { NextResponse } from "next/server";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const password = request.headers.get('admin-password');
-  if (password != process.env.ADMIN_PASSWORD) {
+  const user = await requireAdmin(request);
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -34,11 +35,16 @@ export async function PATCH(
     );
   }
 
+  const newSlotStatus = booking.status === 'accepted' ? 'booked' : 'pending';
+
+  // atomically claim the new slot: only succeeds if it's still 'open', so a
+  // concurrent client booking (or another reschedule) can't win the same slot
   const { data: newSlot, error: newSlotError } = await supabaseAdmin()
     .from('slots')
-    .select()
+    .update({ status: newSlotStatus })
     .eq('id', new_slot_id)
     .eq('status', 'open')
+    .select()
     .single();
 
   if (newSlotError || !newSlot) {
@@ -51,18 +57,9 @@ export async function PATCH(
     .eq('id', booking.slot_id);
 
   if (freeOldSlotError) {
+    // couldn't free the old slot — undo the new slot claim
+    await supabaseAdmin().from('slots').update({ status: 'open' }).eq('id', new_slot_id);
     return NextResponse.json({ error: freeOldSlotError.message }, { status: 500 });
-  }
-
-  const newSlotStatus = booking.status === 'accepted' ? 'booked' : 'pending';
-
-  const { error: claimNewSlotError } = await supabaseAdmin()
-    .from('slots')
-    .update({ status: newSlotStatus })
-    .eq('id', new_slot_id);
-
-  if (claimNewSlotError) {
-    return NextResponse.json({ error: claimNewSlotError.message }, { status: 500 });
   }
 
   const { error: updateBookingError } = await supabaseAdmin()
@@ -71,6 +68,9 @@ export async function PATCH(
     .eq('id', id);
 
   if (updateBookingError) {
+    // couldn't repoint the booking — undo both slot changes
+    await supabaseAdmin().from('slots').update({ status: newSlotStatus }).eq('id', booking.slot_id);
+    await supabaseAdmin().from('slots').update({ status: 'open' }).eq('id', new_slot_id);
     return NextResponse.json({ error: updateBookingError.message }, { status: 500 });
   }
 

@@ -1,11 +1,12 @@
     import { supabaseAdmin } from "@/lib/supabase";
+    import { requireAdmin } from "@/lib/adminAuth";
     import { NextResponse } from "next/server";
 
     export async function PATCH(request:Request, {params}: {params: Promise<{id : string}>}){
-        const password = request.headers.get('admin-password');    
-            if(password != process.env.ADMIN_PASSWORD){
-                    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-                }
+        const user = await requireAdmin(request);
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
         const {id} = await params;
         const {action} = await request.json();
