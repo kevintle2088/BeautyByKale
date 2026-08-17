@@ -21,14 +21,11 @@ const policies = [
 ];
 
 const gallery = [
-  { src: "/gallery-1.jpg", caption: "Caption 1" },
-  { src: "/gallery-2.jpg", caption: "Caption 2" },
-  { src: "/gallery-3.jpg", caption: "Caption 3" },
-  { src: "/gallery-4.jpg", caption: "Caption 4" },
-  { src: "/gallery-5.jpg", caption: "Caption 5" },
-  { src: "/Screenshot 2026-08-12 at 11.11.20 PM.png", caption: "Tier 3" },
-  { src: "/IMG_6562.jpeg", caption: "Tier 4" },
-  { src: "/IMG_0063.jpeg", caption: "Tier 4" },
+  { src: "/IMG_5349.jpeg", caption: "Builder Gel" },
+  { src: "/IMG_0431.jpeg", caption: "Tier 1" },
+  { src: "/IMG_3293.jpeg", caption: "Tier 2" },
+  { src: "/IMG_6505.jpeg", caption: "Freestyle" },
+  { src: "/IMG_5769.jpeg", caption: "Tier 3" },
   { src: "/IMG_7753.jpeg", caption: "Tier 4" },
 ];
 

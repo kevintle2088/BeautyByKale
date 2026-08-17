@@ -15,6 +15,7 @@ type Service = {
   name: string;
   price: number;
   image: string | null;
+  imagePosition?: string;
   kind: "tiered" | "freestyle" | "simple";
 };
 
@@ -35,7 +36,7 @@ type Slot = {
   status: string;
 };
 
-const REMOVAL_PRICE = 15;
+const REMOVAL_ADDON_PRICE = 10;
 
 const TIERS: { id: TierId; label: string; add: number }[] = [
   { id: "none", label: "No Art (Base Set)", add: 0 },
@@ -45,10 +46,10 @@ const TIERS: { id: TierId; label: string; add: number }[] = [
   { id: "tier4", label: "Tier 4", add: 40 },
 ];
 
-const FREESTYLE_TYPES: { id: FreestyleType; label: string }[] = [
-  { id: "normal", label: "Normal" },
-  { id: "moodboard", label: "Moodboard" },
-  { id: "artist", label: "Artist Creative" },
+const FREESTYLE_TYPES: { id: FreestyleType; label: string; description: string }[] = [
+  { id: "normal", label: "Normal", description: "Can choose length & shape but design is completely up to me" },
+  { id: "moodboard", label: "Moodboard", description: "Can choose length & shape but design is completely up to me" },
+  { id: "artist", label: "Artist Creative", description: "Length, shape and design is completely up to me" },
 ];
 
 const LENGTHS: { id: LengthId; label: string }[] = [
@@ -60,11 +61,11 @@ const LENGTHS: { id: LengthId; label: string }[] = [
 
 const SERVICES: Service[] = [
   { id: "builder-gel", name: "Builder Gel / Natural Nail", price: 75, image: "/IMG_6249.jpeg", kind: "tiered" },
-  { id: "gelx-xshort", name: "Gel-X Extra Short", price: 70, image: "/hero.jpg", kind: "tiered" },
+  { id: "gelx-xshort", name: "Gel-X Extra Short", price: 70, image: "/IMG_7087.jpeg", imagePosition: "object-[center_68%]", kind: "tiered" },
   { id: "gelx-short", name: "Gel-X Short", price: 75, image: "/IMG_0063.jpeg", kind: "tiered" },
   { id: "gelx-medium", name: "Gel-X Medium", price: 80, image: "/IMG_6562.jpeg", kind: "tiered" },
-  { id: "gelx-long", name: "Gel-X Long", price: 85, image: "/IMG_7753.jpeg", kind: "tiered" },
-  { id: "freestyle", name: "Freestyle", price: 85, image: null, kind: "freestyle" },
+  { id: "gelx-long", name: "Gel-X Long", price: 85, image: "/IMG_7753.jpeg", imagePosition: "object-[center_60%]", kind: "tiered" },
+  { id: "freestyle", name: "Freestyle", price: 85, image: "/IMG_6505.jpeg", imagePosition: "object-[center_60%]", kind: "freestyle" },
   { id: "removal", name: "Removal Only", price: 15, image: null, kind: "simple" },
 ];
 
@@ -234,7 +235,12 @@ function ServiceCard({
     >
       <div className="relative w-full sm:w-56 h-44 sm:h-auto shrink-0 bg-[var(--sage)]/40">
         {service.image ? (
-          <Image src={service.image} alt={service.name} fill className="object-cover" />
+          <Image
+            src={service.image}
+            alt={service.name}
+            fill
+            className={`object-cover ${service.imagePosition ?? "object-center"}`}
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="font-display text-3xl text-[var(--ink)]/30 tracking-widest">✕</span>
@@ -288,7 +294,7 @@ function ServiceModal({
   const [error, setError] = useState("");
 
   const tier = tierId ? TIERS.find((t) => t.id === tierId)! : null;
-  const total = service.price + (tier?.add ?? 0) + (removal ? REMOVAL_PRICE : 0);
+  const total = service.price + (tier?.add ?? 0) + (removal ? REMOVAL_ADDON_PRICE : 0);
 
   const needsLength = freestyleType === "normal" || freestyleType === "moodboard";
 
@@ -396,9 +402,12 @@ function ServiceModal({
                       setLength(null);
                       setError("");
                     }}
-                    className="accent-[var(--ink)]"
+                    className="accent-[var(--ink)] mt-0.5 shrink-0"
                   />
-                  <span className="text-sm">{f.label}</span>
+                  <span>
+                    <span className="text-sm block">{f.label}</span>
+                    <span className="text-xs text-black/50">{f.description}</span>
+                  </span>
                 </label>
               ))}
             </div>
@@ -439,7 +448,7 @@ function ServiceModal({
               />
               <span className="text-sm">Removing an old set?</span>
             </span>
-            <span className="text-sm text-black/60">+${REMOVAL_PRICE}</span>
+            <span className="text-sm text-black/60">+${REMOVAL_ADDON_PRICE}</span>
           </label>
         )}
 

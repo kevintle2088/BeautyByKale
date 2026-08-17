@@ -27,7 +27,7 @@ export default function GalleryGrid({ items }: { items: GalleryItem[] }) {
   }, []);
 
   return (
-    <div ref={ref} className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+    <div ref={ref} className="mx-auto max-w-3xl grid grid-cols-2 sm:grid-cols-3 gap-4">
       {items.map((item, i) => {
         const row = Math.floor(i / 3);
         const col = i % 3;
