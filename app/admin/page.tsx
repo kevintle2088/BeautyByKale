@@ -600,13 +600,13 @@ function AppointmentsView({
           <div className="flex gap-2">
             <button
               onClick={() => act(b.id, "accept")}
-              className="text-xs bg-[var(--ink)] text-white rounded-full px-3 py-1.5"
+              className="text-xs bg-[var(--ink)] text-white rounded-full px-3 py-1.5 hover:opacity-90 transition-opacity"
             >
               Accept
             </button>
             <button
               onClick={() => act(b.id, "decline")}
-              className="text-xs border border-black/20 rounded-full px-3 py-1.5"
+              className="text-xs border border-black/20 rounded-full px-3 py-1.5 hover:bg-black/5 transition-colors"
             >
               Decline
             </button>
@@ -620,7 +620,7 @@ function AppointmentsView({
         renderActions={(b) => (
           <button
             onClick={() => cancel(b.id)}
-            className="text-xs border border-black/20 rounded-full px-3 py-1.5"
+            className="text-xs border border-black/20 rounded-full px-3 py-1.5 hover:bg-black/5 transition-colors"
           >
             Cancel
           </button>
@@ -830,7 +830,7 @@ function SlotTable({
                 {s.status === "open" && (
                   <button
                     onClick={() => onRemove(s.id)}
-                    className="text-xs border border-black/20 rounded-full px-3 py-1.5"
+                    className="text-xs border border-black/20 rounded-full px-3 py-1.5 hover:bg-black/5 transition-colors"
                   >
                     Remove
                   </button>
