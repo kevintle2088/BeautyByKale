@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-type TierId = "tier1" | "tier2" | "tier3" | "tier4";
+type TierId = "none" | "tier1" | "tier2" | "tier3" | "tier4";
 
 type FreestyleType = "normal" | "moodboard" | "artist";
 
@@ -38,6 +38,7 @@ type Slot = {
 const REMOVAL_PRICE = 15;
 
 const TIERS: { id: TierId; label: string; add: number }[] = [
+  { id: "none", label: "No Art (Base Set)", add: 0 },
   { id: "tier1", label: "Tier 1", add: 25 },
   { id: "tier2", label: "Tier 2", add: 30 },
   { id: "tier3", label: "Tier 3", add: 35 },
@@ -109,7 +110,7 @@ export default function BookPage() {
   const cartTotal = cart.reduce((sum, item) => sum + item.total, 0);
 
   function addToCart(item: CartItem) {
-    setCart((prev) => [...prev, item]);
+    setCart([item]);
     setActiveService(null);
   }
 
@@ -135,11 +136,13 @@ export default function BookPage() {
       {step === "services" && (
         <>
           <div className="mx-auto max-w-3xl px-6 space-y-5">
-            {SERVICES.map((service) => (
+            {SERVICES.map((service, i) => (
               <ServiceCard
                 key={service.id}
                 service={service}
+                disabled={cart.length > 0}
                 onSelect={() => setActiveService(service)}
+                delay={i * 90}
               />
             ))}
           </div>
@@ -147,16 +150,24 @@ export default function BookPage() {
           {cart.length > 0 && (
             <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-black/10 px-6 py-4">
               <div className="mx-auto max-w-3xl flex items-center justify-between gap-4">
-                <div className="text-sm">
-                  <span className="font-medium">{cart.length}</span> item{cart.length > 1 ? "s" : ""} · $
-                  {cartTotal}
+                <div className="text-sm min-w-0">
+                  <span className="font-medium truncate block">{describeItem(cart[0])}</span>
+                  <span className="text-black/60">${cartTotal}</span>
                 </div>
-                <button
-                  onClick={() => setStep("details")}
-                  className="bg-[var(--ink)] text-white rounded-full px-6 py-2.5 text-sm tracking-wide hover:opacity-90 transition-opacity"
-                >
-                  Continue
-                </button>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => removeFromCart(cart[0].key)}
+                    className="text-xs text-black/50 hover:text-black underline underline-offset-2"
+                  >
+                    Change service
+                  </button>
+                  <button
+                    onClick={() => setStep("details")}
+                    className="bg-[var(--ink)] text-white rounded-full px-6 py-2.5 text-sm tracking-wide hover:opacity-90 transition-opacity"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -201,11 +212,25 @@ export default function BookPage() {
   );
 }
 
-function ServiceCard({ service, onSelect }: { service: Service; onSelect: () => void }) {
+function ServiceCard({
+  service,
+  onSelect,
+  delay = 0,
+  disabled = false,
+}: {
+  service: Service;
+  onSelect: () => void;
+  delay?: number;
+  disabled?: boolean;
+}) {
   return (
     <button
       onClick={onSelect}
-      className="w-full text-left flex flex-col sm:flex-row border border-black/10 rounded-2xl overflow-hidden bg-white hover:shadow-lg transition-shadow"
+      disabled={disabled}
+      style={{ animationDelay: `${delay}ms` }}
+      className={`animate-grow-in w-full text-left flex flex-col sm:flex-row border border-black/10 rounded-2xl overflow-hidden bg-white transition-shadow ${
+        disabled ? "opacity-40 cursor-not-allowed" : "hover:shadow-lg"
+      }`}
     >
       <div className="relative w-full sm:w-56 h-44 sm:h-auto shrink-0 bg-[var(--sage)]/40">
         {service.image ? (
@@ -260,17 +285,30 @@ function ServiceModal({
   const [freestyleType, setFreestyleType] = useState<FreestyleType | null>(null);
   const [length, setLength] = useState<LengthId | null>(null);
   const [removal, setRemoval] = useState(false);
+  const [error, setError] = useState("");
 
   const tier = tierId ? TIERS.find((t) => t.id === tierId)! : null;
   const total = service.price + (tier?.add ?? 0) + (removal ? REMOVAL_PRICE : 0);
 
   const needsLength = freestyleType === "normal" || freestyleType === "moodboard";
-  const canAdd = service.kind !== "freestyle" || (freestyleType !== null && (!needsLength || length !== null));
 
   function handleAdd() {
+    if (service.kind === "tiered" && tierId === null) {
+      setError("Please select an art tier.");
+      return;
+    }
+    if (service.kind === "freestyle" && freestyleType === null) {
+      setError("Please select a freestyle style.");
+      return;
+    }
+    if (service.kind === "freestyle" && needsLength && length === null) {
+      setError("Please select a length.");
+      return;
+    }
+
     let tierLabel: string | null = null;
     if (service.kind === "tiered") {
-      tierLabel = tier?.label ?? null;
+      tierLabel = tier && tier.id !== "none" ? tier.label : null;
     } else if (service.kind === "freestyle" && freestyleType) {
       const typeLabel = FREESTYLE_TYPES.find((f) => f.id === freestyleType)!.label;
       const lengthLabel = length ? LENGTHS.find((l) => l.id === length)!.label : null;
@@ -311,10 +349,6 @@ function ServiceModal({
           <div className="mb-5">
             <p className="text-sm font-medium mb-2">Art tier</p>
             <div className="space-y-2">
-              <div className="flex items-center justify-between border border-black/10 rounded-xl px-4 py-3 opacity-40 cursor-default select-none">
-                <span className="text-sm">No Art (Base Set)</span>
-                <span className="text-sm">included</span>
-              </div>
               {TIERS.map((t) => (
                 <label
                   key={t.id}
@@ -327,12 +361,15 @@ function ServiceModal({
                       type="radio"
                       name="tier"
                       checked={tierId === t.id}
-                      onChange={() => setTierId(t.id)}
+                      onChange={() => {
+                        setTierId(t.id);
+                        setError("");
+                      }}
                       className="accent-[var(--ink)]"
                     />
                     <span className="text-sm">{t.label}</span>
                   </span>
-                  <span className="text-sm text-black/60">+${t.add}</span>
+                  <span className="text-sm text-black/60">{t.add === 0 ? "included" : `+$${t.add}`}</span>
                 </label>
               ))}
             </div>
@@ -357,6 +394,7 @@ function ServiceModal({
                     onChange={() => {
                       setFreestyleType(f.id);
                       setLength(null);
+                      setError("");
                     }}
                     className="accent-[var(--ink)]"
                   />
@@ -370,7 +408,10 @@ function ServiceModal({
                 <label className="block text-sm mb-1">Length</label>
                 <select
                   value={length ?? ""}
-                  onChange={(e) => setLength(e.target.value as LengthId)}
+                  onChange={(e) => {
+                    setLength(e.target.value as LengthId);
+                    setError("");
+                  }}
                   className="w-full border border-black/20 rounded-lg px-3 py-2 text-sm"
                 >
                   <option value="" disabled>
@@ -407,10 +448,11 @@ function ServiceModal({
           <span className="font-display text-xl">${total}</span>
         </div>
 
+        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+
         <button
           onClick={handleAdd}
-          disabled={!canAdd}
-          className="w-full bg-[var(--ink)] text-white rounded-full py-3 text-sm tracking-wide hover:opacity-90 transition-opacity disabled:opacity-40"
+          className="w-full bg-[var(--ink)] text-white rounded-full py-3 text-sm tracking-wide hover:opacity-90 transition-opacity"
         >
           Add to Cart
         </button>
@@ -445,11 +487,46 @@ function DetailsStep({
   const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
-    fetch("/api/slots")
-      .then((res) => res.json())
-      .then((data) => setSlots(data.slots || []))
-      .finally(() => setLoadingSlots(false));
+    function refreshSlots(opts?: { silent?: boolean }) {
+      if (!opts?.silent) setLoadingSlots(true);
+      fetch("/api/slots")
+        .then((res) => res.json())
+        .then((data) => {
+          const fresh: Slot[] = data.slots || [];
+          setSlots(fresh);
+          setSlotId((current) => {
+            if (current && !fresh.some((s) => s.id === current)) {
+              setMessage("That time was just taken — please pick another.");
+              return "";
+            }
+            return current;
+          });
+        })
+        .finally(() => setLoadingSlots(false));
+    }
+
+    refreshSlots();
+    const interval = setInterval(() => refreshSlots({ silent: true }), 15000);
+
+    function onFocus() {
+      refreshSlots({ silent: true });
+    }
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") refreshSlots({ silent: true });
+    }
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
+
+  useEffect(() => {
+    if (cart.length === 0) onBack();
+  }, [cart.length, onBack]);
 
   const slotsByDate = useMemo(() => {
     const map = new Map<string, Slot[]>();
@@ -494,6 +571,10 @@ function DetailsStep({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (cart.length === 0) {
+      setMessage("Please select at least one service.");
+      return;
+    }
     if (!slotId) {
       setMessage("Please select a time.");
       return;

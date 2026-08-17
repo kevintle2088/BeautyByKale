@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/adminAuth";
+import { sendSMS, formatApptDateTime } from "@/lib/sms";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request){
@@ -71,6 +72,11 @@ export async function POST(request: Request) {
     if (updateError) {
         return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
+
+    await sendSMS(
+        client_phone,
+        `Hi ${client_name}, your ${service} appointment on ${formatApptDateTime(slot.date, slot.time)} is confirmed! See you then.`
+    );
 
     return NextResponse.json({ booking }, { status: 201 });
 }

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/adminAuth";
+import { sendSMS, formatApptDateTime } from "@/lib/sms";
 import { NextResponse } from "next/server";
 
 export async function PATCH(
@@ -73,6 +74,11 @@ export async function PATCH(
     await supabaseAdmin().from('slots').update({ status: 'open' }).eq('id', new_slot_id);
     return NextResponse.json({ error: updateBookingError.message }, { status: 500 });
   }
+
+  await sendSMS(
+    booking.client_phone,
+    `Hi ${booking.client_name}, your ${booking.service} appointment has been rescheduled to ${formatApptDateTime(newSlot.date, newSlot.time)}.`
+  );
 
   return NextResponse.json(
     { message: "Booking rescheduled", bookingId: id, newSlotId: new_slot_id },

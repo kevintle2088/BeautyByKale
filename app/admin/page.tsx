@@ -27,7 +27,15 @@ type Tab = "calendar" | "add" | "appointments" | "reschedule";
 
 async function authHeaders(): Promise<HeadersInit> {
   const { data } = await supabasePublic.auth.getSession();
-  return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {};
+  let session = data.session;
+
+  const expiresInMs = session?.expires_at ? session.expires_at * 1000 - Date.now() : 0;
+  if (session && expiresInMs < 60000) {
+    const { data: refreshed } = await supabasePublic.auth.refreshSession();
+    session = refreshed.session ?? session;
+  }
+
+  return session ? { Authorization: `Bearer ${session.access_token}` } : {};
 }
 
 export default function AdminPage() {
@@ -52,14 +60,21 @@ export default function AdminPage() {
     checkSession();
   }, [router]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     const headers = await authHeaders();
     const [bookingsRes, slotsRes, allSlotsRes] = await Promise.all([
       fetch("/api/admin/bookings", { headers }),
       fetch("/api/slots"),
       fetch("/api/admin/slots", { headers }),
     ]);
+
+    if (bookingsRes.status === 401 || allSlotsRes.status === 401) {
+      await supabasePublic.auth.signOut();
+      router.push("/admin/login?expired=1");
+      return;
+    }
+
     const bookingsData = await bookingsRes.json();
     const slotsData = await slotsRes.json();
     const allSlotsData = await allSlotsRes.json();
@@ -67,12 +82,29 @@ export default function AdminPage() {
     setOpenSlots(slotsData.slots || []);
     setAllSlots(allSlotsData.slots || []);
     setLoading(false);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
-    if (!checking) {
-      loadData();
+    if (checking) return;
+
+    loadData();
+
+    const interval = setInterval(() => loadData({ silent: true }), 15000);
+
+    function onFocus() {
+      loadData({ silent: true });
     }
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") loadData({ silent: true });
+    }
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [checking, loadData]);
 
   async function handleLogout() {
@@ -89,9 +121,10 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="flex min-h-[80vh]">
+    <div className="flex flex-col sm:flex-row min-h-[80vh]">
       <Sidebar tab={tab} setTab={setTab} onLogout={handleLogout} />
-      <div className="flex-1 px-8 py-10">
+      <MobileTabBar tab={tab} setTab={setTab} onLogout={handleLogout} />
+      <div className="flex-1 min-w-0 px-4 sm:px-8 py-6 sm:py-10">
         {loading ? (
           <p className="text-sm text-black/50">Loading...</p>
         ) : (
@@ -138,7 +171,7 @@ function Sidebar({
   ];
 
   return (
-    <aside className="w-56 shrink-0 bg-[var(--sage)]/30 border-r border-black/10 px-4 py-10 flex flex-col justify-between">
+    <aside className="hidden sm:flex w-56 shrink-0 bg-[var(--sage)]/30 border-r border-black/10 px-4 py-10 flex-col justify-between">
       <nav className="flex flex-col gap-1">
         {items.map((item) => (
           <button
@@ -161,6 +194,70 @@ function Sidebar({
         Log out
       </button>
     </aside>
+  );
+}
+
+function MobileTabBar({
+  tab,
+  setTab,
+  onLogout,
+}: {
+  tab: Tab;
+  setTab: (t: Tab) => void;
+  onLogout: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const items: { key: Tab; label: string }[] = [
+    { key: "calendar", label: "Calendar" },
+    { key: "add", label: "Add Timeslots" },
+    { key: "appointments", label: "Appointments" },
+    { key: "reschedule", label: "Reschedule" },
+  ];
+  const currentLabel = items.find((i) => i.key === tab)?.label ?? "Menu";
+
+  return (
+    <div className="sm:hidden relative border-b border-black/10 bg-[var(--sage)]/30">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3.5"
+        aria-label="Menu"
+        aria-expanded={open}
+      >
+        <span className="text-sm font-medium tracking-wide">{currentLabel}</span>
+        <span className={`text-black/50 transition-transform ${open ? "rotate-180" : ""}`}>
+          ⌄
+        </span>
+      </button>
+      {open && (
+        <nav className="animate-grow-in absolute top-full inset-x-0 z-30 bg-[var(--sage)] border-b border-black/10 shadow-lg flex flex-col px-4 py-3 gap-1">
+          {items.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => {
+                setTab(item.key);
+                setOpen(false);
+              }}
+              className={`text-left px-4 py-2.5 rounded-lg text-sm tracking-wide transition-colors ${
+                tab === item.key
+                  ? "bg-[var(--ink)] text-white"
+                  : "hover:bg-black/5"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              setOpen(false);
+              onLogout();
+            }}
+            className="text-left px-4 py-2.5 mt-1 pt-3 border-t border-black/10 text-sm text-black/50 hover:text-black transition-colors"
+          >
+            Log out
+          </button>
+        </nav>
+      )}
+    </div>
   );
 }
 

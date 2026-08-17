@@ -14,7 +14,12 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ slots: data });
+  const now = new Date();
+  const upcoming = (data || []).filter(
+    (slot) => new Date(`${slot.date}T${slot.time}`) > now
+  );
+
+  return NextResponse.json({ slots: upcoming });
 }
 
 export async function POST(request: Request) {

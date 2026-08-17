@@ -1,15 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabasePublic } from "@/lib/supabase";
 
 export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLoginForm />
+    </Suspense>
+  );
+}
+
+function AdminLoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const expired = searchParams.get("expired") === "1";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -38,6 +48,12 @@ export default function AdminLoginPage() {
         <h1 className="font-display text-2xl tracking-[0.1em] uppercase text-center mb-8">
           Admin Login
         </h1>
+
+        {expired && (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+            Your session expired. Please log in again.
+          </p>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>

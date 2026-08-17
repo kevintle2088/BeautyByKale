@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { notifyAdmin, formatApptDateTime } from '@/lib/sms';
 import { NextResponse } from 'next/server';
 
 
@@ -58,6 +59,10 @@ export async function POST(request: Request){
         await supabaseAdmin().from('slots').update({ status: 'open' }).eq('id', slot_id);
         return NextResponse.json({ error: bookingError.message || 'Failed to create booking' }, { status: 500 });
     }
+
+    await notifyAdmin(
+        `New booking request: ${client_name} wants ${service} on ${formatApptDateTime(slot.date, slot.time)}. Check the admin panel to confirm.`
+    );
 
     return NextResponse.json({ booking }, { status: 201 });
 }

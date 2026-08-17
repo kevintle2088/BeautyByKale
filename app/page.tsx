@@ -1,4 +1,5 @@
 import Image from "next/image";
+import GalleryGrid from "./GalleryGrid";
 
 const policies = [
   {
@@ -25,7 +26,7 @@ const gallery = [
   { src: "/gallery-3.jpg", caption: "Caption 3" },
   { src: "/gallery-4.jpg", caption: "Caption 4" },
   { src: "/gallery-5.jpg", caption: "Caption 5" },
-  { src: "/gallery-6.jpg", caption: "Caption 6" },
+  { src: "/Screenshot 2026-08-12 at 11.11.20 PM.png", caption: "Tier 3" },
   { src: "/IMG_6562.jpeg", caption: "Tier 4" },
   { src: "/IMG_0063.jpeg", caption: "Tier 4" },
   { src: "/IMG_7753.jpeg", caption: "Tier 4" },
@@ -95,23 +96,7 @@ export default function HomePage() {
         <h2 className="font-display text-center text-2xl sm:text-3xl tracking-[0.1em] uppercase mb-12">
           Gallery
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {gallery.map((item, i) => (
-            <div key={i}>
-              <div className="relative aspect-square bg-[var(--sage)]/40">
-                <Image
-                  src={item.src}
-                  alt={item.caption}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <p className="mt-2 text-center text-sm text-black">
-                {item.caption}
-              </p>
-            </div>
-          ))}
-        </div>
+        <GalleryGrid items={gallery} />
       </section>
     </>
   );

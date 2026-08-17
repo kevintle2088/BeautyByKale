@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { requireAdmin } from "@/lib/adminAuth";
+import { sendSMS, formatApptDateTime } from "@/lib/sms";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireAdmin(request);
@@ -12,7 +13,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { data: booking, error: findError } = await supabaseAdmin()
     .from('bookings')
-    .select()
+    .select('*, slots(*)')
     .eq('id', id)
     .single();
 
@@ -40,6 +41,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (slotUpdateError) {
     return NextResponse.json({ error: slotUpdateError.message }, { status: 500 });
+  }
+
+  if (booking.slots) {
+    await sendSMS(
+      booking.client_phone,
+      `Hi ${booking.client_name}, your ${booking.service} appointment on ${formatApptDateTime(booking.slots.date, booking.slots.time)} has been cancelled. Please contact us if you have questions.`
+    );
   }
 
   return NextResponse.json({ message: "Booking cancelled" }, { status: 200 });
