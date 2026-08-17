@@ -89,7 +89,7 @@ export default function AdminPage() {
 
     loadData();
 
-    const interval = setInterval(() => loadData({ silent: true }), 15000);
+    const interval = setInterval(() => loadData({ silent: true }), 90000);
 
     function onFocus() {
       loadData({ silent: true });
@@ -100,10 +100,21 @@ export default function AdminPage() {
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
+    const channel = supabasePublic
+      .channel("admin-data-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () =>
+        loadData({ silent: true })
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "slots" }, () =>
+        loadData({ silent: true })
+      )
+      .subscribe();
+
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      supabasePublic.removeChannel(channel);
     };
   }, [checking, loadData]);
 
@@ -589,13 +600,13 @@ function AppointmentsView({
           <div className="flex gap-2">
             <button
               onClick={() => act(b.id, "accept")}
-              className="text-xs bg-[var(--ink)] text-white rounded-full px-3 py-1.5"
+              className="text-xs bg-[var(--ink)] text-white rounded-full px-3 py-1.5 hover:opacity-90 transition-opacity"
             >
               Accept
             </button>
             <button
               onClick={() => act(b.id, "decline")}
-              className="text-xs border border-black/20 rounded-full px-3 py-1.5"
+              className="text-xs border border-black/20 rounded-full px-3 py-1.5 hover:bg-black/5 transition-colors"
             >
               Decline
             </button>
@@ -609,7 +620,7 @@ function AppointmentsView({
         renderActions={(b) => (
           <button
             onClick={() => cancel(b.id)}
-            className="text-xs border border-black/20 rounded-full px-3 py-1.5"
+            className="text-xs border border-black/20 rounded-full px-3 py-1.5 hover:bg-black/5 transition-colors"
           >
             Cancel
           </button>
@@ -819,7 +830,7 @@ function SlotTable({
                 {s.status === "open" && (
                   <button
                     onClick={() => onRemove(s.id)}
-                    className="text-xs border border-black/20 rounded-full px-3 py-1.5"
+                    className="text-xs border border-black/20 rounded-full px-3 py-1.5 hover:bg-black/5 transition-colors"
                   >
                     Remove
                   </button>
