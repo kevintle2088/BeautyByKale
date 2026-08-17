@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { supabasePublic } from "@/lib/supabase";
 
 type TierId = "none" | "tier1" | "tier2" | "tier3" | "tier4";
 
@@ -515,7 +516,7 @@ function DetailsStep({
     }
 
     refreshSlots();
-    const interval = setInterval(() => refreshSlots({ silent: true }), 15000);
+    const interval = setInterval(() => refreshSlots({ silent: true }), 90000);
 
     function onFocus() {
       refreshSlots({ silent: true });
@@ -526,10 +527,18 @@ function DetailsStep({
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
+    const channel = supabasePublic
+      .channel("book-slots-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "slots" }, () =>
+        refreshSlots({ silent: true })
+      )
+      .subscribe();
+
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      supabasePublic.removeChannel(channel);
     };
   }, []);
 

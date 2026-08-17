@@ -89,7 +89,7 @@ export default function AdminPage() {
 
     loadData();
 
-    const interval = setInterval(() => loadData({ silent: true }), 15000);
+    const interval = setInterval(() => loadData({ silent: true }), 90000);
 
     function onFocus() {
       loadData({ silent: true });
@@ -100,10 +100,21 @@ export default function AdminPage() {
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
+    const channel = supabasePublic
+      .channel("admin-data-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "bookings" }, () =>
+        loadData({ silent: true })
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "slots" }, () =>
+        loadData({ silent: true })
+      )
+      .subscribe();
+
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      supabasePublic.removeChannel(channel);
     };
   }, [checking, loadData]);
 
