@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const bookingPolicies = [
   {
@@ -116,9 +116,18 @@ function PolicyGrid({ entries }: { entries: PolicyEntry[] }) {
 }
 
 function PoliciesContent() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const initialTab: Tab = searchParams.get("tab") === "privacy" ? "privacy" : "booking";
   const [tab, setTab] = useState<Tab>(initialTab);
+
+  function goToTab(next: Tab) {
+    setTab(next);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", next);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
 
   return (
     <section className="mx-auto max-w-6xl px-6 py-20">
@@ -128,7 +137,7 @@ function PoliciesContent() {
 
       <div className="flex items-center justify-center gap-2 mb-10">
         <button
-          onClick={() => setTab("booking")}
+          onClick={() => goToTab("booking")}
           className={`text-xs px-4 py-2 rounded-full transition-colors ${
             tab === "booking"
               ? "bg-[var(--ink)] text-white"
@@ -138,7 +147,7 @@ function PoliciesContent() {
           Booking Policies
         </button>
         <button
-          onClick={() => setTab("privacy")}
+          onClick={() => goToTab("privacy")}
           className={`text-xs px-4 py-2 rounded-full transition-colors ${
             tab === "privacy"
               ? "bg-[var(--ink)] text-white"
