@@ -75,10 +75,12 @@ export async function PATCH(
     return NextResponse.json({ error: updateBookingError.message }, { status: 500 });
   }
 
-  await sendSMS(
-    booking.client_phone,
-    `Hi ${booking.client_name}, your ${booking.service} appointment has been rescheduled to ${formatApptDateTime(newSlot.date, newSlot.time)}.`
-  );
+  if (booking.sms_opt_in) {
+    await sendSMS(
+      booking.client_phone,
+      `Hi ${booking.client_name}, your ${booking.service} appointment has been rescheduled to ${formatApptDateTime(newSlot.date, newSlot.time)}.`
+    );
+  }
 
   return NextResponse.json(
     { message: "Booking rescheduled", bookingId: id, newSlotId: new_slot_id },

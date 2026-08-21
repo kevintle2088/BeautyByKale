@@ -43,7 +43,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: slotUpdateError.message }, { status: 500 });
   }
 
-  if (booking.slots) {
+  if (booking.slots && booking.sms_opt_in) {
     await sendSMS(
       booking.client_phone,
       `Hi ${booking.client_name}, your ${booking.service} appointment on ${formatApptDateTime(booking.slots.date, booking.slots.time)} has been cancelled. Please contact us if you have questions.`

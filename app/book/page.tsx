@@ -495,6 +495,7 @@ function DetailsStep({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [agreed, setAgreed] = useState(false);
+  const [smsOptIn, setSmsOptIn] = useState(false);
 
   useEffect(() => {
     function refreshSlots(opts?: { silent?: boolean }) {
@@ -615,6 +616,7 @@ function DetailsStep({
         client_email: email,
         client_phone: phone,
         service: serviceSummary,
+        sms_opt_in: smsOptIn,
       }),
     });
 
@@ -793,6 +795,23 @@ function DetailsStep({
               booking policies
             </Link>
             , including the deposit and cancellation terms.
+          </span>
+        </label>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={smsOptIn}
+            onChange={(e) => setSmsOptIn(e.target.checked)}
+            className="mt-0.5 accent-[var(--ink)]"
+          />
+          <span className="text-sm text-black/70">
+            I consent to receive SMS text messages about my appointment (confirmations,
+            reminders, and schedule changes). Message and data rates may apply. Consent is not a condition of purchase. Reply STOP to
+            opt out at any time. See the{" "}
+            <Link href="/policies?tab=privacy" target="_blank" className="underline underline-offset-2 hover:text-black">
+              privacy policy / terms and conditions
+            </Link>
+            . This is optional — you can still book without it.
           </span>
         </label>
 

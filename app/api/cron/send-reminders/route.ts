@@ -21,7 +21,8 @@ export async function GET(request: Request) {
     .from("bookings")
     .select("*, slots(*)")
     .eq("status", "accepted")
-    .eq("reminder_sent", false);
+    .eq("reminder_sent", false)
+    .eq("sms_opt_in", true);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
